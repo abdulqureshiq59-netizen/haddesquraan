@@ -99,6 +99,39 @@
   details.card[open] > summary::before { content:'▾  '; }
   details.card > section { border:0; border-top:1px solid var(--line); border-radius:0; padding:16px 0 0; }
   details.card:not([open]) > *:not(summary) { display:none !important; }
+  /* ---------- our own popup, instead of the browser's ---------- */
+  #modal { position:fixed; inset:0; z-index:20; display:none; place-items:center; padding:18px;
+    background:rgba(8,16,12,.45); backdrop-filter:blur(3px); opacity:0; transition:opacity .16s; }
+  #modal.show { display:grid; opacity:1; }
+  #modal .box { width:100%; max-width:400px; background:var(--card); border:1px solid var(--line);
+    border-radius:18px; padding:22px; box-shadow:0 18px 50px rgba(0,0,0,.25);
+    transform:translateY(12px) scale(.98); transition:transform .18s; }
+  #modal.show .box { transform:none; }
+  #modal h3 { margin:0 0 8px; font-size:17px; }
+  #modal p { margin:0; color:var(--muted); font-size:14px; white-space:pre-line; }
+  #modal .acts { display:flex; gap:10px; margin-top:20px; }
+  #modal .acts button { flex:1; padding:12px; }
+
+  /* ---------- phones ---------- */
+  @media (max-width:560px) {
+    body { font-size:14.5px; }
+    .htop { gap:8px; }
+    h1 { font-size:16px; }
+    #nextRun { max-width:100%; white-space:normal; line-height:1.35; }
+    main { padding:14px 12px 60px; gap:13px; }
+    .wrap { padding:0 12px; }
+    .card { padding:15px; border-radius:13px; }
+    nav button { padding:9px 12px; font-size:13.5px; }
+    .big-num { font-size:26px; }
+    .row > button, .row > .hint { width:100%; }
+    button.big { width:100%; }
+    .row > input, .row > select { min-width:0; }
+    table { font-size:12.5px; }
+    th, td { padding:7px 6px; }
+    .qr img { width:min(250px, 78vw); }
+    .code { font-size:24px; letter-spacing:3px; }
+  }
+
   .spin { display:inline-block; width:13px; height:13px; border:2px solid currentColor; border-right-color:transparent;
     border-radius:50%; animation:sp .7s linear infinite; vertical-align:-2px; margin-right:7px; }
   @keyframes sp { to { transform:rotate(360deg); } }
@@ -214,6 +247,16 @@
   </div>
 </main>
 <div id="toast"></div>
+<div id="modal" role="dialog" aria-modal="true">
+  <div class="box">
+    <h3 id="modalTitle"></h3>
+    <p id="modalText"></p>
+    <div class="acts">
+      <button id="modalNo" type="button">Cancel</button>
+      <button id="modalYes" type="button" class="primary">Yes</button>
+    </div>
+  </div>
+</div>
 <script>
 let S = null, groups = [], filled = false, pollTimer, tab = 'home';
 try { tab = localStorage.getItem('qh-tab') || 'home'; } catch {}
@@ -233,6 +276,30 @@ function showTab(t) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// our own confirm box - the browser one looks bad and cannot be styled
+function ask(title, text, yesLabel = 'Yes', danger = false) {
+  return new Promise((resolve) => {
+    const m = $('modal'), yes = $('modalYes'), no = $('modalNo');
+    $('modalTitle').textContent = title;
+    $('modalText').textContent = text || '';
+    yes.textContent = yesLabel;
+    yes.className = danger ? 'stop' : 'primary';
+    m.classList.add('show');
+    const done = (v) => {
+      m.classList.remove('show');
+      yes.onclick = no.onclick = m.onclick = null;
+      document.removeEventListener('keydown', onKey);
+      resolve(v);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') done(false); if (e.key === 'Enter') done(true); };
+    yes.onclick = () => done(true);
+    no.onclick = () => done(false);
+    m.onclick = (e) => { if (e.target === m) done(false); };
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => yes.focus(), 60);
+  });
+}
+
 function toast(m, ms=3200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'), ms); }
 
 // every button that does something shows it is working
@@ -247,6 +314,7 @@ async function busy(btn, fn) {
 
 async function api(url, opts={}) {
   const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  if (r.status === 401) { location.href = '/login'; throw new Error('Please sign in again'); }
   const j = await r.json().catch(()=>({ok:false,error:'Server did not answer properly'}));
   if (!j.ok) throw new Error(j.error || 'Request failed');
   return j;
@@ -267,14 +335,16 @@ async function saveSettings(btn, body, reloadDrive) {
 
 async function toggleRun() {
   const starting = S.settings.paused;
-  if (!starting && !confirm('Stop the automation?\n\nNothing will be posted until you start it again.')) return;
+  if (!starting && !await ask('Stop the automation?', 'Nothing will be posted until you start it again.', 'Stop', true)) return;
   await saveSettings($('runBtn'), { paused: !starting });
   toast(starting ? 'Automation started' : 'Automation stopped');
 }
 
 async function toggleLiveRepeat(btn) {
   const on = !S.settings.liveRepeat;
-  if (on && !confirm(`This posts for real to “${S.settings.targetName || S.settings.targetJid}” every ${S.settings.testIntervalMin} minutes and uses up images.\n\nContinue?`)) return;
+  if (on && !await ask('Start live repeat?',
+      `Real posts will go to “${S.settings.targetName || S.settings.targetJid}” every ${S.settings.testIntervalMin} minutes, and images will be used up.`,
+      'Start', true)) return;
   saveSettings(btn, { liveRepeat: on });
 }
 
@@ -293,7 +363,7 @@ function renderWA(w) {
   let h;
   if (w.state === 'connected') {
     h = `<dl class="kv"><dt>Number</dt><dd>${esc((w.me?.id||'').split('@')[0])}</dd><dt>Name</dt><dd>${esc(w.me?.name||'–')}</dd><dt>Connected</dt><dd>${fmt(w.connectedAt)}</dd></dl>
-      <div class="row"><button class="danger" onclick="if(confirm('Unlink this WhatsApp number?')) apiBtn(this,'/api/logout','Logged out')">Log out</button></div>
+      <div class="row"><button class="danger" onclick="logoutWhatsApp(this)">Log out</button></div>
       <div class="hint">Run only one copy of the bot. PC and server at the same time will fight over the session.</div>`;
   } else if (w.state === 'replaced') {
     h = `<div class="banner bad">${esc(w.lastError)}</div><div class="row"><button class="primary" onclick="apiBtn(this,'/api/reconnect','Reconnecting')">Reconnect</button></div>`;
@@ -328,6 +398,11 @@ function renderWA(w) {
     $('qrLeft').textContent = s ? `This code refreshes in ${s}s` : 'Refreshing code…';
   }
 }
+async function logoutWhatsApp(btn) {
+  if (!await ask('Unlink this WhatsApp number?', 'You will have to scan the QR code again to connect it back.', 'Unlink', true)) return;
+  apiBtn(btn, '/api/logout', 'Logged out');
+}
+
 async function pair(btn) {
   const phone = val('pairPhone');
   if (!phone) return toast('Type the number with country code');
@@ -349,7 +424,7 @@ function render() {
   }
   const s = S.settings;
   $('now').textContent = S.now;
-  $('nextRun').textContent = S.nextRun.text;
+  $('nextRun').textContent = S.nextRun.short || S.nextRun.text;
   $('nextRun').className = 'pill ' + (s.paused ? 'bad' : (s.testMode || s.liveRepeat) ? 'warn' : 'ok');
 
   const b = [];
@@ -455,7 +530,7 @@ function renderGroups() {
   }).join('') : `<tr><td colspan="5" class="muted">No groups match. Try “All groups”.</td></tr>`;
 }
 async function setTarget(btn, kind, id, name) {
-  if (kind==='live' && !confirm(`Daily posts will go to “${name}”.\n\nIs that the right group?`)) return;
+  if (kind === 'live' && !await ask('Use this group for the daily post?', `Every day the images will go to “${name}”.`, 'Yes, use it')) return;
   await busy(btn, async () => {
     try { await post('/api/target', { kind, id, name }); toast(`${kind.toUpperCase()} group set: ${name}`); }
     catch (e) { toast(e.message, 6000); }
