@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in — Quran &amp; Hadees Bot</title>
+<style>
+  :root { --bg:#f2f5f3; --card:#fff; --text:#15201a; --muted:#67756e; --line:#e2e8e4; --soft:#f7faf8;
+    --accent:#0e7a54; --accent-2:#0b6144; --accent-soft:#e2f3eb; --bad:#b3261e; --bad-soft:#fde8e6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0d1211; --card:#161d1a; --text:#e7ede9; --muted:#95a39c; --line:#26302b; --soft:#121816;
+      --accent:#43c992; --accent-2:#57d9a3; --accent-soft:#133527; --bad:#ff7b72; --bad-soft:#3b1614; } }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100dvh; display:grid; place-items:center; padding:20px;
+    background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .box { width:100%; max-width:380px; background:var(--card); border:1px solid var(--line);
+    border-radius:18px; padding:28px 24px; box-shadow:0 10px 40px rgba(0,0,0,.07); }
+  .logo { width:52px; height:52px; border-radius:15px; background:var(--accent-soft); color:var(--accent);
+    display:grid; place-items:center; font-size:25px; margin:0 auto 16px; }
+  h1 { font-size:19px; margin:0 0 4px; text-align:center; }
+  p.sub { color:var(--muted); font-size:13.5px; margin:0 0 20px; text-align:center; }
+  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
+  input { width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:11px;
+    background:var(--soft); color:var(--text); font:inherit; transition:border-color .15s, box-shadow .15s; }
+  input:focus { outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  button { width:100%; margin-top:20px; padding:13px; border:0; border-radius:11px; background:var(--accent);
+    color:#fff; font:inherit; font-weight:600; font-size:15px; cursor:pointer;
+    transition:background .15s, transform .08s; }
+  button:hover:not(:disabled) { background:var(--accent-2); }
+  button:active:not(:disabled) { transform:scale(.97); }
+  button:disabled { opacity:.6; cursor:progress; }
+  .err { margin-top:14px; padding:11px 13px; border-radius:11px; background:var(--bad-soft); color:var(--bad);
+    font-size:13.5px; display:none; }
+  .err.show { display:block; }
+  .spin { display:inline-block; width:14px; height:14px; border:2px solid currentColor;
+    border-right-color:transparent; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-2px; margin-right:8px; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+  <form class="box" id="form">
+    <div class="logo">🕌</div>
+    <h1>Quran &amp; Hadees Poster</h1>
+    <p class="sub">Sign in to open the dashboard</p>
+    <label for="user">User name</label>
+    <input id="user" value="admin" autocomplete="username" autocapitalize="none" spellcheck="false">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" autofocus>
+    <button id="btn" type="submit">Sign in</button>
+    <div class="err" id="err"></div>
+  </form>
+<script>
+  const $ = (id) => document.getElementById(id);
+  $('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('btn'), err = $('err');
+    err.classList.remove('show');
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Signing in…';
+    try {
+      const r = await fetch('/api/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: $('user').value, password: $('password').value }),
+      });
+      const j = await r.json().catch(() => ({ ok: false, error: 'Server did not answer' }));
+      if (j.ok) { location.href = '/'; return; }
+      err.textContent = j.error || 'Wrong password'; err.classList.add('show');
+      $('password').select();
+    } catch (e2) {
+      err.textContent = 'Could not reach the server'; err.classList.add('show');
+    }
+    btn.disabled = false; btn.textContent = 'Sign in';
+  });
+</script>
+</body>
+</html>
