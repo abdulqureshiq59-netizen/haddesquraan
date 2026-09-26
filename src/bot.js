@@ -158,12 +158,16 @@ async function tick() {
 function nextRun() {
   const st = store.get();
   const s = st.settings;
-  if (s.paused) return { text: 'Paused', minutes: null };
+  if (s.paused) return { text: 'Paused', short: 'Stopped', minutes: null };
   if (s.liveRepeat || s.testMode) {
     const live = s.liveRepeat;
     const ms = Math.max(0, st.test.lastAt + s.testIntervalMin * 60000 - Date.now());
     const who = live ? (s.targetName || 'LIVE group') : (s.testTargetName || 'test group');
-    return { text: `${live ? 'LIVE repeat' : 'TEST post'} to ${who} in ${Math.ceil(ms / 1000)}s`, minutes: ms / 60000, repeating: true };
+    return {
+      text: `${live ? 'LIVE repeat' : 'TEST post'} to ${who} in ${Math.ceil(ms / 1000)}s`,
+      short: `${live ? 'LIVE repeat' : 'Test'} in ${Math.ceil(ms / 1000)}s`,
+      minutes: ms / 60000, repeating: true,
+    };
   }
   const now = nowParts(s.timezone);
   const pt = parseHHMM(s.postTime).minutes;
@@ -180,7 +184,10 @@ function nextRun() {
     : late > 0
     ? `Today's ${s.postTime} was missed by more than ${s.catchupHours}h - next `
     : 'Next ';
-  return { text: why + when, minutes: mins, done, tomorrow };
+  const short = done ? `Done · next ${s.postTime}`
+    : late > 0 ? `Missed · next ${s.postTime}`
+    : `${tomorrow ? 'Tomorrow' : 'Today'} ${s.postTime} · ${h}h ${m}m`;
+  return { text: why + when, short, minutes: mins, done, tomorrow };
 }
 
 // Drive stats for the dashboard (cached 60s)
