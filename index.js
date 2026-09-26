@@ -55,20 +55,49 @@ app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.send('ok')); // for uptime pings (keeps Render awake)
 
-// Simple password protection for the dashboard
+// ---------- login ----------
 const same = (a, b) => {
   const x = Buffer.from(String(a));
   const y = Buffer.from(String(b));
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 };
-app.use((req, res, next) => {
-  if (!PASS) return next();
+const COOKIE = 'qh_session';
+const sessionToken = () => crypto.createHmac('sha256', String(PASS) + '|' + String(USER)).update('qh-v1').digest('hex');
+
+function signedIn(req) {
+  if (!PASS) return true;
+  const raw = req.headers.cookie || '';
+  const hit = raw.split(';').map((c) => c.trim()).find((c) => c.startsWith(COOKIE + '='));
+  if (hit && same(hit.slice(COOKIE.length + 1), sessionToken())) return true;
+  // Basic auth still works, so curl / uptime checks keep working
   const [type, value] = (req.headers.authorization || '').split(' ');
   if (type === 'Basic' && value) {
     const [u, ...p] = Buffer.from(value, 'base64').toString().split(':');
-    if (same(u, USER) && same(p.join(':'), PASS)) return next();
+    if (same(u, USER) && same(p.join(':'), PASS)) return true;
   }
-  res.set('WWW-Authenticate', 'Basic realm="Quran Hadees Bot"').status(401).send('Login required');
+  return false;
+}
+
+app.post('/api/login', (req, res) => {
+  const { user, password } = req.body || {};
+  if (!PASS || (same(user || USER, USER) && same(password || '', PASS))) {
+    res.setHeader('Set-Cookie', `${COOKIE}=${sessionToken()}; Path=/; Max-Age=${60 * 60 * 24 * 30}; HttpOnly; SameSite=Lax`);
+    return res.json({ ok: true });
+  }
+  res.status(401).json({ ok: false, error: 'Wrong user name or password' });
+});
+
+app.post('/api/signout', (req, res) => {
+  res.setHeader('Set-Cookie', `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`);
+  res.json({ ok: true });
+});
+
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+
+app.use((req, res, next) => {
+  if (signedIn(req)) return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ ok: false, error: 'Please sign in again' });
+  res.redirect('/login');
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
