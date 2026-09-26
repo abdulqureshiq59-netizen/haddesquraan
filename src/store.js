@@ -67,6 +67,26 @@ function normalize(s = {}) {
   };
 }
 
+// These are set in .env, not in the dashboard any more. Whatever .env says wins at every
+// start, so changing .env is enough - no more "the dashboard still has the old value".
+const ENV_KEYS = {
+  quranFolder: 'QURAN_FOLDER_ID',
+  hadeesFolder: 'HADEES_FOLDER_ID',
+  driveSource: 'DRIVE_SOURCE',
+  quranCaption: 'QURAN_CAPTION',
+  hadeesCaption: 'HADEES_CAPTION',
+  pickOrder: 'PICK_ORDER',
+  adminNumber: 'ADMIN_NUMBER',
+  testTargetJid: 'TEST_GROUP_JID',
+};
+function applyEnv(st) {
+  for (const [key, envName] of Object.entries(ENV_KEYS)) {
+    const v = process.env[envName];
+    if (v !== undefined && v !== '') st.settings[key] = key === 'adminNumber' ? digits(v) : v.trim();
+  }
+  return st;
+}
+
 let state = null;
 let blocked = false; // true = Sheet backup exists but could not be read yet
 const backupInfo = { restoredFrom: null, lastMirrorAt: null };
@@ -115,7 +135,7 @@ function save() {
 async function tryRestore() {
   const data = await sheets.getBlob('state');
   if (!data) return false;
-  state = normalize(decode(data));
+  state = applyEnv(normalize(decode(data)));
   blocked = false;
   writeLocal();
   backupInfo.restoredFrom = 'sheet';
@@ -125,7 +145,7 @@ async function tryRestore() {
 
 async function init() {
   if (fs.existsSync(STATE_FILE)) {
-    state = normalize(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')));
+    state = applyEnv(normalize(JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'))));
     backupInfo.restoredFrom = 'local';
     scheduleMirror(2000);
     return 'local';
