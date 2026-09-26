@@ -93,6 +93,12 @@
     max-width:calc(100% - 32px); z-index:9; pointer-events:none; transition:opacity .18s, transform .18s; }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   [hidden] { display:none !important; }
+  details.card > summary { cursor:pointer; font-weight:600; list-style:none; }
+  details.card > summary::-webkit-details-marker { display:none; }
+  details.card > summary::before { content:'▸  '; color:var(--muted); }
+  details.card[open] > summary::before { content:'▾  '; }
+  details.card > section { border:0; border-top:1px solid var(--line); border-radius:0; padding:16px 0 0; }
+  details.card:not([open]) > *:not(summary) { display:none !important; }
   .spin { display:inline-block; width:13px; height:13px; border:2px solid currentColor; border-right-color:transparent;
     border-radius:50%; animation:sp .7s linear infinite; vertical-align:-2px; margin-right:7px; }
   @keyframes sp { to { transform:rotate(360deg); } }
@@ -146,16 +152,6 @@
       <div class="row"><button data-act="drive" onclick="loadDrive(true,this)">Refresh counts</button></div>
     </section>
 
-    <section class="card">
-      <h2>Send one now</h2>
-      <p class="what">Only for checking. The daily post keeps working on its own.</p>
-      <div class="row tight">
-        <button data-act="s1" onclick="send('self',this)">To my number</button>
-        <button data-act="s2" onclick="send('test',this)">To TEST group</button>
-        <button class="primary" data-act="s3" onclick="send('manual',this)">To LIVE group</button>
-      </div>
-      <div id="sendResult" class="hint"></div>
-    </section>
   </div>
 
   <!-- ========== WHATSAPP ========== -->
@@ -189,52 +185,15 @@
     <section class="card">
       <h2>Chosen groups</h2>
       <dl class="kv"><dt>LIVE</dt><dd id="liveGroup">–</dd><dt>TEST</dt><dd id="testGroup">–</dd></dl>
-      <div class="hint">For a Community, pick its <b>Announcements</b> group — that is the one everybody sees.</div>
+      <div class="hint">For a Community, pick its <b>Announcements</b> group — that is the one everybody sees. The TEST group comes from <code>TEST_GROUP_JID</code> in the settings file.</div>
     </section>
   </div>
 
   <!-- ========== SETTINGS ========== -->
   <div id="page-settings" hidden>
     <section class="card">
-      <h2>Google Drive folders</h2>
-      <label for="driveSource">Read images using</label>
-      <select id="driveSource" onchange="saveSettings(null,{driveSource:this.value},true)">
-        <option value="service">The service account (folders shared with its email)</option>
-        <option value="script">My own Google account, through the Apps Script</option>
-      </select>
-      <div id="saEmail"></div>
-      <label for="quranFolder">Quran folder link or ID</label>
-      <input id="quranFolder" placeholder="https://drive.google.com/drive/folders/…">
-      <label for="hadeesFolder">Hadees folder link or ID</label>
-      <input id="hadeesFolder" placeholder="https://drive.google.com/drive/folders/…">
-      <div class="row"><button class="primary" data-act="sf" onclick="saveSettings(this,{quranFolder:val('quranFolder'),hadeesFolder:val('hadeesFolder')},true)">Save folders</button></div>
-    </section>
-
-    <section class="card">
-      <h2>Captions &amp; alerts</h2>
-      <div class="two">
-        <div>
-          <label for="quranCaption">Caption under the Quran image</label><textarea id="quranCaption"></textarea>
-          <label for="hadeesCaption">Caption under the Hadees image</label><textarea id="hadeesCaption"></textarea>
-        </div>
-        <div>
-          <label for="pickOrder">Which image goes next</label>
-          <select id="pickOrder">
-            <option value="name">File-name order (1, 2, 3 …)</option>
-            <option value="created">Oldest upload first</option>
-            <option value="random">Random (never repeats)</option>
-          </select>
-          <label for="adminNumber">My WhatsApp number for alerts</label>
-          <input id="adminNumber" placeholder="923001234567">
-          <div class="hint">You get a message if a folder runs out, or a post fails.</div>
-        </div>
-      </div>
-      <div class="row"><button class="primary" data-act="sc" onclick="saveSettings(this,{quranCaption:val('quranCaption'),hadeesCaption:val('hadeesCaption'),pickOrder:val('pickOrder'),adminNumber:val('adminNumber')})">Save</button></div>
-    </section>
-
-    <section class="card">
       <h2>Testing <span class="pill warn" id="testPill" hidden>running</span></h2>
-      <p class="what">Turn both off before handing over to the client.</p>
+      <p class="what">For checking before handover. Turn both off when you are done.</p>
       <div class="row tight">
         <button id="testModeBtn" data-act="tm" onclick="saveSettings(this,{testMode:!S.settings.testMode})">–</button>
         <span class="hint" style="margin:0">Posts to the <b>TEST</b> group. Real images are not used up.</span>
@@ -251,25 +210,6 @@
         <button data-act="rt" onclick="apiBtn(this,'/api/reset-test','Test list cleared')">Reset test list</button>
       </div>
       <div class="hint" id="testInfo"></div>
-    </section>
-
-    <section class="card">
-      <h2>Google Sheet backup <span class="pill" id="backupPill">–</span></h2>
-      <p class="what">Needed on Render's free plan: it keeps the posted list and the WhatsApp login when the server restarts.</p>
-      <dl class="kv" id="backupKv"></dl>
-      <div class="row">
-        <button class="primary" data-act="sch" onclick="sheetCheck(this)">Check connection</button>
-        <button data-act="bn" onclick="apiBtn(this,'/api/backup-now','Backup saved')">Backup now</button>
-      </div>
-      <div id="sheetInfo" class="hint"></div>
-    </section>
-
-    <section class="card">
-      <h2>Full history</h2>
-      <div class="tablewrap"><table>
-        <thead><tr><th>Time</th><th>Mode</th><th>Folder</th><th>File</th><th>Sent to</th><th>Result</th></tr></thead>
-        <tbody id="historyRows"></tbody>
-      </table></div>
     </section>
   </div>
 </main>
@@ -336,18 +276,6 @@ async function toggleLiveRepeat(btn) {
   const on = !S.settings.liveRepeat;
   if (on && !confirm(`This posts for real to “${S.settings.targetName || S.settings.targetJid}” every ${S.settings.testIntervalMin} minutes and uses up images.\n\nContinue?`)) return;
   saveSettings(btn, { liveRepeat: on });
-}
-
-async function send(mode, btn) {
-  if (mode === 'manual' && !confirm('Send the next Quran + Hadees images to the LIVE group now?')) return;
-  await busy(btn, async () => {
-    $('sendResult').textContent = 'Sending…';
-    try {
-      const { results } = await post('/api/send', { mode });
-      $('sendResult').innerHTML = results.map((r)=>`${esc(r.item)}: ${r.error?'❌ '+esc(r.error):r.skipped?esc(r.skipped):'✅ '+esc(r.file)}`).join('<br>');
-    } catch (e) { $('sendResult').textContent = '❌ ' + e.message; }
-    refresh(); loadDrive(true);
-  });
 }
 
 /* ---------- WhatsApp ---------- */
@@ -463,12 +391,6 @@ function render() {
   $('testGroup').innerHTML = s.testTargetJid ? `<b>${esc(s.testTargetName||'')}</b> <code>${esc(s.testTargetJid)}</code>` : '<span class="muted">not chosen yet</span>';
 
   /* settings */
-  const em = S.serviceAccountEmail;
-  $('saEmail').innerHTML = s.driveSource === 'script'
-    ? `<div class="hint">Images are read <b>as you</b> through the Apps Script. Needs the Google Sheet connection below.</div>`
-    : em ? `<div class="hint">Folders must be shared with <code>${esc(em)}</code> <button class="small" onclick="navigator.clipboard.writeText('${esc(em)}');toast('Copied')">Copy</button></div>`
-      : `<div class="banner bad" style="margin-top:10px">No Google key loaded.</div>`;
-
   $('testModeBtn').textContent = s.testMode ? '■  Stop test mode' : '▶  Start test mode';
   $('testModeBtn').className = s.testMode ? 'stop' : '';
   $('liveRepeatBtn').textContent = s.liveRepeat ? '■  Stop live repeat' : '▶  Start live repeat';
@@ -476,27 +398,11 @@ function render() {
   $('testPill').hidden = !(s.testMode || s.liveRepeat);
   $('testInfo').textContent = (s.testMode || s.liveRepeat) ? `${S.test.count} of ${s.testMaxPosts} posts done in this run.` : '';
 
-  const bk = S.backup;
-  $('backupPill').textContent = !bk.enabled ? 'Off' : bk.blocked ? 'Restore failed' : bk.lastError ? 'Error' : bk.lastOkAt ? 'Working' : 'Not checked';
-  $('backupPill').className = 'pill ' + (!bk.enabled ? '' : bk.blocked || bk.lastError ? 'bad' : bk.lastOkAt ? 'ok' : 'warn');
-  $('backupKv').innerHTML =
-    `<dt>Sheet</dt><dd>${bk.info ? esc(bk.info.sheetName) : '<span class="muted">press Check connection</span>'}</dd>
-     <dt>Last saved</dt><dd>list: ${fmt(bk.stateLastBackupAt)}<br>login: ${fmt(bk.sessionLastBackupAt)}</dd>
-     <dt>Loaded at start</dt><dd>list: ${esc(bk.stateRestoredFrom||'–')}, login: ${esc(bk.sessionRestored||'–')}</dd>
-     <dt>Already posted</dt><dd>Quran ${S.sentCount.quran}, Hadees ${S.sentCount.hadees}</dd>
-     ${bk.lastError?`<dt>Problem</dt><dd style="color:var(--bad)">${esc(bk.lastError)}</dd>`:''}`;
-
-  $('historyRows').innerHTML = S.history.length
-    ? S.history.map((h)=>`<tr><td>${fmt(h.at)}</td><td>${esc(h.mode)}</td><td>${esc(h.item)}</td><td>${esc(h.file||'')}</td><td>${esc(h.target||'')}</td><td>${h.ok?'✅ sent':'❌ '+esc(h.error)}</td></tr>`).join('')
-    : '<tr><td colspan="6" class="muted">Nothing sent yet.</td></tr>';
-
   if (!filled) {
     filled = true;
-    $('postTime').value = s.postTime; $('testInterval').value = s.testIntervalMin; $('testMax').value = s.testMaxPosts;
-    $('quranCaption').value = s.quranCaption; $('hadeesCaption').value = s.hadeesCaption;
-    $('pickOrder').value = s.pickOrder; $('adminNumber').value = s.adminNumber;
-    $('quranFolder').value = s.quranFolder; $('hadeesFolder').value = s.hadeesFolder;
-    $('driveSource').value = s.driveSource;
+    $('postTime').value = s.postTime;
+    $('testInterval').value = s.testIntervalMin;
+    $('testMax').value = s.testMaxPosts;
   }
   renderGroups();
 }
@@ -545,7 +451,7 @@ function renderGroups() {
     const nm = esc(JSON.stringify(g.name));
     return `<tr><td>${esc(g.name)}${tag}</td><td>${esc(g.type)}${note}</td><td>${g.members}</td>
       <td><div class="idcell"><code>${esc(g.id)}</code><button class="small" onclick="navigator.clipboard.writeText('${esc(g.id)}');toast('Copied')">Copy</button></div></td>
-      <td style="white-space:nowrap">${g.canPost?`<button class="small" onclick='setTarget(this,"test","${esc(g.id)}",${nm})'>Set TEST</button> <button class="small primary" onclick='setTarget(this,"live","${esc(g.id)}",${nm})'>Set LIVE</button>`:'<span class="muted">—</span>'}</td></tr>`;
+      <td style="white-space:nowrap">${g.canPost?`<button class="small primary" onclick='setTarget(this,"live","${esc(g.id)}",${nm})'>Set LIVE</button>`:'<span class="muted">—</span>'}</td></tr>`;
   }).join('') : `<tr><td colspan="5" class="muted">No groups match. Try “All groups”.</td></tr>`;
 }
 async function setTarget(btn, kind, id, name) {
@@ -553,17 +459,6 @@ async function setTarget(btn, kind, id, name) {
   await busy(btn, async () => {
     try { await post('/api/target', { kind, id, name }); toast(`${kind.toUpperCase()} group set: ${name}`); }
     catch (e) { toast(e.message, 6000); }
-    refresh();
-  });
-}
-
-async function sheetCheck(btn) {
-  await busy(btn, async () => {
-    $('sheetInfo').textContent = 'Checking…';
-    try {
-      const { info } = await post('/api/sheet-check');
-      $('sheetInfo').innerHTML = `✅ Connected to <b>${esc(info.sheetName)}</b>${info.sheetUrl?` — <a href="${esc(info.sheetUrl)}" target="_blank" rel="noopener">open</a>`:''}`;
-    } catch (e) { $('sheetInfo').innerHTML = `❌ ${esc(e.message)}`; }
     refresh();
   });
 }
