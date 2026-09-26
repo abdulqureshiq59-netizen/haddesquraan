@@ -1,0 +1,21 @@
+{
+  "name": "quran-hadees-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "Posts one new Quran image and one new Hadees image from Google Drive to a WhatsApp Community every day, with dashboard and Google Sheet backup",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test/run.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0",
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
+  }
+}

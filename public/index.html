@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quran &amp; Hadees Bot</title>
+<style>
+  :root { --bg:#f2f5f3; --card:#fff; --text:#15201a; --muted:#67756e; --line:#e2e8e4; --soft:#f7faf8;
+    --accent:#0e7a54; --accent-2:#0b6144; --accent-soft:#e2f3eb; --warn:#8c5600; --warn-soft:#fff3d9;
+    --bad:#b3261e; --bad-soft:#fde8e6; --r:14px; --shadow:0 1px 2px rgba(0,0,0,.05); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0d1211; --card:#161d1a; --text:#e7ede9; --muted:#95a39c; --line:#26302b; --soft:#121816;
+      --accent:#43c992; --accent-2:#57d9a3; --accent-soft:#133527; --warn:#f0b24a; --warn-soft:#382a10;
+      --bad:#ff7b72; --bad-soft:#3b1614; --shadow:none; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-tap-highlight-color:transparent; }
+  header { position:sticky; top:0; z-index:5; background:var(--bg); border-bottom:1px solid var(--line); }
+  .wrap { max-width:900px; margin:0 auto; padding:0 16px; }
+  .htop { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; justify-content:space-between; padding:14px 0 0; }
+  h1 { font-size:17px; margin:0; }
+  .sub { color:var(--muted); font-size:12.5px; }
+  nav { display:flex; gap:2px; margin-top:12px; overflow-x:auto; }
+  nav button { border:0; background:none; color:var(--muted); font:inherit; font-weight:600; font-size:14px;
+    padding:10px 15px; border-radius:10px 10px 0 0; border-bottom:2px solid transparent; cursor:pointer;
+    white-space:nowrap; transition:color .15s, background .15s; }
+  nav button:hover { color:var(--text); background:var(--soft); }
+  nav button.on { color:var(--accent); border-bottom-color:var(--accent); background:var(--card); }
+  main { max-width:900px; margin:0 auto; padding:18px 16px 70px; display:grid; gap:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:18px; box-shadow:var(--shadow); }
+  .card h2 { font-size:15px; margin:0 0 4px; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  .what { color:var(--muted); font-size:13px; margin:0 0 14px; }
+  .two { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+  .pill { display:inline-block; padding:3px 10px; border-radius:99px; font-size:12px; font-weight:600; background:var(--line); color:var(--muted); white-space:nowrap; }
+  .pill.ok { background:var(--accent-soft); color:var(--accent); }
+  .pill.warn { background:var(--warn-soft); color:var(--warn); }
+  .pill.bad { background:var(--bad-soft); color:var(--bad); }
+  .banner { padding:12px 14px; border-radius:var(--r); font-size:13.5px; }
+  .banner.warn { background:var(--warn-soft); color:var(--warn); }
+  .banner.bad { background:var(--bad-soft); color:var(--bad); }
+  .banner.ok { background:var(--accent-soft); color:var(--accent); }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 5px; }
+  input, select, textarea { width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    background:var(--soft); color:var(--text); font:inherit; transition:border-color .15s, box-shadow .15s; }
+  input:focus, select:focus, textarea:focus { outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  textarea { min-height:54px; resize:vertical; }
+  button { font:inherit; font-weight:600; padding:10px 16px; border-radius:10px; border:1px solid var(--line);
+    background:var(--card); color:var(--text); cursor:pointer; position:relative;
+    transition:transform .08s ease, background .15s, border-color .15s, opacity .15s; }
+  button:hover:not(:disabled) { border-color:var(--accent); background:var(--soft); }
+  button:active:not(:disabled) { transform:scale(.96); }
+  button:disabled { opacity:.55; cursor:progress; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button.primary:hover:not(:disabled) { background:var(--accent-2); border-color:var(--accent-2); }
+  button.big { padding:15px 22px; font-size:16px; border-radius:12px; }
+  button.stop { background:var(--bad); border-color:var(--bad); color:#fff; }
+  button.stop:hover:not(:disabled) { opacity:.9; background:var(--bad); }
+  button.small { padding:5px 11px; font-size:12.5px; border-radius:8px; }
+  button.danger { color:var(--bad); }
+  nav button:active { transform:none; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+  .row.tight { margin-top:8px; }
+  .row > input, .row > select { flex:1; min-width:150px; }
+  .hint { font-size:12.5px; color:var(--muted); margin-top:8px; }
+  .kv { display:grid; grid-template-columns:max-content 1fr; gap:6px 14px; font-size:14px; margin:0; }
+  .kv dt { color:var(--muted); } .kv dd { margin:0; overflow-wrap:anywhere; }
+  .big-num { font-size:30px; font-weight:700; line-height:1.15; }
+  .stat { border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--soft); }
+  .stat small { color:var(--muted); display:block; overflow-wrap:anywhere; }
+  .feed { list-style:none; margin:0; padding:0; }
+  .feed li { display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--line); align-items:flex-start; }
+  .feed li:last-child { border-bottom:0; }
+  .dot { flex:none; width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-size:13px; background:var(--accent-soft); color:var(--accent); }
+  .dot.bad { background:var(--bad-soft); color:var(--bad); }
+  .feed .when { color:var(--muted); font-size:12.5px; }
+  .feed .file { font-weight:600; overflow-wrap:anywhere; }
+  .qr { text-align:center; padding:6px 0; }
+  .qr img { width:250px; max-width:100%; background:#fff; padding:10px; border-radius:12px; }
+  .code { font:700 30px/1.2 ui-monospace,Menlo,Consolas,monospace; letter-spacing:4px; text-align:center;
+    padding:16px; background:var(--accent-soft); color:var(--accent); border-radius:12px; }
+  .tablewrap { overflow-x:auto; margin-top:12px; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th,td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); }
+  tbody tr { transition:background .15s; }
+  tbody tr:hover { background:var(--soft); }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  td code { font-size:12px; color:var(--muted); overflow-wrap:anywhere; }
+  td small { display:block; color:var(--muted); font-size:12px; }
+  .idcell { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  ol.steps { margin:10px 0 0; padding-left:20px; } ol.steps li { margin-bottom:7px; }
+  .muted { color:var(--muted); }
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(10px); opacity:0;
+    background:var(--text); color:var(--bg); padding:12px 18px; border-radius:12px; font-size:14px;
+    max-width:calc(100% - 32px); z-index:9; pointer-events:none; transition:opacity .18s, transform .18s; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  [hidden] { display:none !important; }
+  .spin { display:inline-block; width:13px; height:13px; border:2px solid currentColor; border-right-color:transparent;
+    border-radius:50%; animation:sp .7s linear infinite; vertical-align:-2px; margin-right:7px; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="htop">
+    <div><h1>Quran &amp; Hadees Daily Poster</h1><div class="sub">Kuwait time: <span id="now">–</span></div></div>
+    <span class="pill" id="nextRun">–</span>
+  </div>
+  <nav>
+    <button id="tab-home" class="on" onclick="showTab('home')">Home</button>
+    <button id="tab-whatsapp" onclick="showTab('whatsapp')">WhatsApp</button>
+    <button id="tab-groups" onclick="showTab('groups')">Groups</button>
+    <button id="tab-settings" onclick="showTab('settings')">Settings</button>
+  </nav>
+</div></header>
+
+<main>
+  <div id="banners"></div>
+
+  <!-- ========== HOME ========== -->
+  <div id="page-home">
+    <section class="card">
+      <h2>Daily post <span class="pill" id="runPill">–</span></h2>
+      <div class="two" style="margin-top:12px">
+        <div class="stat"><small>Post time (Kuwait)</small><div class="big-num" id="homeTime">–</div><small id="homeNote"></small></div>
+        <div class="stat"><small>Sent today</small><div class="big-num" id="homeToday">–</div><small id="homeTodayNote"></small></div>
+      </div>
+      <div class="row">
+        <button id="runBtn" class="big" onclick="toggleRun()">–</button>
+        <div class="hint" style="margin:0" id="runHint"></div>
+      </div>
+      <label for="postTime">Change the daily time</label>
+      <div class="row tight">
+        <input id="postTime" type="time" style="max-width:160px;flex:none">
+        <button class="primary" data-act="saveTime" onclick="saveSettings(this,{postTime:val('postTime')})">Save time</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>What went out <button class="small" data-act="refresh" onclick="refresh(this)">Refresh</button></h2>
+      <p class="what">Newest first — file name, time and which group.</p>
+      <ul class="feed" id="feed"></ul>
+    </section>
+
+    <section class="card">
+      <h2>Images left in Drive</h2>
+      <div class="two" id="driveTiles" style="margin-top:12px"></div>
+      <div class="row"><button data-act="drive" onclick="loadDrive(true,this)">Refresh counts</button></div>
+    </section>
+
+    <section class="card">
+      <h2>Send one now</h2>
+      <p class="what">Only for checking. The daily post keeps working on its own.</p>
+      <div class="row tight">
+        <button data-act="s1" onclick="send('self',this)">To my number</button>
+        <button data-act="s2" onclick="send('test',this)">To TEST group</button>
+        <button class="primary" data-act="s3" onclick="send('manual',this)">To LIVE group</button>
+      </div>
+      <div id="sendResult" class="hint"></div>
+    </section>
+  </div>
+
+  <!-- ========== WHATSAPP ========== -->
+  <div id="page-whatsapp" hidden>
+    <section class="card">
+      <h2>WhatsApp connection <span class="pill" id="waPill">–</span></h2>
+      <p class="what">The number that posts the images. It must be an admin of the group it posts to.</p>
+      <div id="waBody" class="muted">Loading…</div>
+    </section>
+  </div>
+
+  <!-- ========== GROUPS ========== -->
+  <div id="page-groups" hidden>
+    <section class="card">
+      <h2>Your groups</h2>
+      <p class="what">Only groups where this number is an <b>admin</b> — a bot can only post where it is allowed to.</p>
+      <div class="row tight">
+        <button class="primary" data-act="lg" onclick="loadGroups(this)">Load groups</button>
+        <input id="groupSearch" placeholder="Search by name…" oninput="renderGroups()">
+        <select id="groupFilter" onchange="renderGroups()">
+          <option value="admin">Only where I am admin</option>
+          <option value="post">Where I can post</option>
+          <option value="all">All groups</option>
+        </select>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Group</th><th>Type</th><th>Members</th><th>Group ID</th><th></th></tr></thead>
+        <tbody id="groupRows"><tr><td colspan="5" class="muted">Press “Load groups”.</td></tr></tbody>
+      </table></div>
+    </section>
+    <section class="card">
+      <h2>Chosen groups</h2>
+      <dl class="kv"><dt>LIVE</dt><dd id="liveGroup">–</dd><dt>TEST</dt><dd id="testGroup">–</dd></dl>
+      <div class="hint">For a Community, pick its <b>Announcements</b> group — that is the one everybody sees.</div>
+    </section>
+  </div>
+
+  <!-- ========== SETTINGS ========== -->
+  <div id="page-settings" hidden>
+    <section class="card">
+      <h2>Google Drive folders</h2>
+      <label for="driveSource">Read images using</label>
+      <select id="driveSource" onchange="saveSettings(null,{driveSource:this.value},true)">
+        <option value="service">The service account (folders shared with its email)</option>
+        <option value="script">My own Google account, through the Apps Script</option>
+      </select>
+      <div id="saEmail"></div>
+      <label for="quranFolder">Quran folder link or ID</label>
+      <input id="quranFolder" placeholder="https://drive.google.com/drive/folders/…">
+      <label for="hadeesFolder">Hadees folder link or ID</label>
+      <input id="hadeesFolder" placeholder="https://drive.google.com/drive/folders/…">
+      <div class="row"><button class="primary" data-act="sf" onclick="saveSettings(this,{quranFolder:val('quranFolder'),hadeesFolder:val('hadeesFolder')},true)">Save folders</button></div>
+    </section>
+
+    <section class="card">
+      <h2>Captions &amp; alerts</h2>
+      <div class="two">
+        <div>
+          <label for="quranCaption">Caption under the Quran image</label><textarea id="quranCaption"></textarea>
+          <label for="hadeesCaption">Caption under the Hadees image</label><textarea id="hadeesCaption"></textarea>
+        </div>
+        <div>
+          <label for="pickOrder">Which image goes next</label>
+          <select id="pickOrder">
+            <option value="name">File-name order (1, 2, 3 …)</option>
+            <option value="created">Oldest upload first</option>
+            <option value="random">Random (never repeats)</option>
+          </select>
+          <label for="adminNumber">My WhatsApp number for alerts</label>
+          <input id="adminNumber" placeholder="923001234567">
+          <div class="hint">You get a message if a folder runs out, or a post fails.</div>
+        </div>
+      </div>
+      <div class="row"><button class="primary" data-act="sc" onclick="saveSettings(this,{quranCaption:val('quranCaption'),hadeesCaption:val('hadeesCaption'),pickOrder:val('pickOrder'),adminNumber:val('adminNumber')})">Save</button></div>
+    </section>
+
+    <section class="card">
+      <h2>Testing <span class="pill warn" id="testPill" hidden>running</span></h2>
+      <p class="what">Turn both off before handing over to the client.</p>
+      <div class="row tight">
+        <button id="testModeBtn" data-act="tm" onclick="saveSettings(this,{testMode:!S.settings.testMode})">–</button>
+        <span class="hint" style="margin:0">Posts to the <b>TEST</b> group. Real images are not used up.</span>
+      </div>
+      <div class="row tight">
+        <button id="liveRepeatBtn" data-act="lr" onclick="toggleLiveRepeat(this)">–</button>
+        <span class="hint" style="margin:0">Posts to the <b>LIVE</b> group for real, and does use up images.</span>
+      </div>
+      <div class="row">
+        <span class="muted">Every</span><input id="testInterval" type="number" min="1" max="60" style="max-width:74px;flex:none">
+        <span class="muted">min, stop after</span><input id="testMax" type="number" min="1" max="200" style="max-width:74px;flex:none">
+        <span class="muted">posts</span>
+        <button data-act="ti" onclick="saveSettings(this,{testIntervalMin:+val('testInterval'),testMaxPosts:+val('testMax')})">Save</button>
+        <button data-act="rt" onclick="apiBtn(this,'/api/reset-test','Test list cleared')">Reset test list</button>
+      </div>
+      <div class="hint" id="testInfo"></div>
+    </section>
+
+    <section class="card">
+      <h2>Google Sheet backup <span class="pill" id="backupPill">–</span></h2>
+      <p class="what">Needed on Render's free plan: it keeps the posted list and the WhatsApp login when the server restarts.</p>
+      <dl class="kv" id="backupKv"></dl>
+      <div class="row">
+        <button class="primary" data-act="sch" onclick="sheetCheck(this)">Check connection</button>
+        <button data-act="bn" onclick="apiBtn(this,'/api/backup-now','Backup saved')">Backup now</button>
+      </div>
+      <div id="sheetInfo" class="hint"></div>
+    </section>
+
+    <section class="card">
+      <h2>Full history</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Time</th><th>Mode</th><th>Folder</th><th>File</th><th>Sent to</th><th>Result</th></tr></thead>
+        <tbody id="historyRows"></tbody>
+      </table></div>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+<script>
+let S = null, groups = [], filled = false, pollTimer, tab = 'home';
+try { tab = localStorage.getItem('qh-tab') || 'home'; } catch {}
+const TABS = ['home','whatsapp','groups','settings'];
+const $ = (id) => document.getElementById(id);
+const val = (id) => $(id).value;
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '–';
+const clock = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '';
+const day = (iso) => iso ? new Date(iso).toLocaleDateString([], { day:'numeric', month:'short' }) : '';
+
+function showTab(t) {
+  tab = t;
+  try { localStorage.setItem('qh-tab', t); } catch {}
+  for (const n of TABS) { $('page-' + n).hidden = n !== t; $('tab-' + n).className = n === t ? 'on' : ''; }
+  if (t === 'groups') renderGroups();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toast(m, ms=3200){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'), ms); }
+
+// every button that does something shows it is working
+async function busy(btn, fn) {
+  if (!btn) return fn();
+  const label = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>' + label;
+  try { return await fn(); }
+  finally { btn.disabled = false; btn.innerHTML = label; }
+}
+
+async function api(url, opts={}) {
+  const r = await fetch(url, { headers:{'Content-Type':'application/json'}, ...opts });
+  const j = await r.json().catch(()=>({ok:false,error:'Server did not answer properly'}));
+  if (!j.ok) throw new Error(j.error || 'Request failed');
+  return j;
+}
+const post = (url, body={}) => api(url, { method:'POST', body:JSON.stringify(body) });
+const apiBtn = (btn, url, okMsg) => busy(btn, async () => {
+  try { await post(url); toast(okMsg); await refresh(); } catch (e) { toast(e.message, 6000); }
+});
+
+async function saveSettings(btn, body, reloadDrive) {
+  await busy(btn, async () => {
+    try { await post('/api/settings', body); toast('Saved'); }
+    catch (e) { toast(e.message, 6000); return; }
+    await refresh();
+    if (reloadDrive) loadDrive(true);
+  });
+}
+
+async function toggleRun() {
+  const starting = S.settings.paused;
+  if (!starting && !confirm('Stop the automation?\n\nNothing will be posted until you start it again.')) return;
+  await saveSettings($('runBtn'), { paused: !starting });
+  toast(starting ? 'Automation started' : 'Automation stopped');
+}
+
+async function toggleLiveRepeat(btn) {
+  const on = !S.settings.liveRepeat;
+  if (on && !confirm(`This posts for real to “${S.settings.targetName || S.settings.targetJid}” every ${S.settings.testIntervalMin} minutes and uses up images.\n\nContinue?`)) return;
+  saveSettings(btn, { liveRepeat: on });
+}
+
+async function send(mode, btn) {
+  if (mode === 'manual' && !confirm('Send the next Quran + Hadees images to the LIVE group now?')) return;
+  await busy(btn, async () => {
+    $('sendResult').textContent = 'Sending…';
+    try {
+      const { results } = await post('/api/send', { mode });
+      $('sendResult').innerHTML = results.map((r)=>`${esc(r.item)}: ${r.error?'❌ '+esc(r.error):r.skipped?esc(r.skipped):'✅ '+esc(r.file)}`).join('<br>');
+    } catch (e) { $('sendResult').textContent = '❌ ' + e.message; }
+    refresh(); loadDrive(true);
+  });
+}
+
+/* ---------- WhatsApp ---------- */
+const WA_TEXT = { starting:['Starting…',''], qr:['Waiting for scan','warn'], refreshing:['Waiting for scan','warn'],
+                  pairing:['Waiting for code','warn'], finishing:['Almost done…','warn'] };
+function renderWA(w) {
+  let txt, cls;
+  if (w.state === 'connected') [txt, cls] = ['Connected', 'ok'];
+  else if (w.state === 'reconnecting') [txt, cls] = ['Reconnecting…', 'warn'];
+  else if (w.state === 'replaced') [txt, cls] = ['Opened elsewhere', 'bad'];
+  else if (w.state === 'logged_out') [txt, cls] = ['Logged out', 'bad'];
+  else [txt, cls] = WA_TEXT[w.stage] || ['Connecting…', ''];
+  $('waPill').textContent = txt; $('waPill').className = 'pill ' + cls;
+
+  let h;
+  if (w.state === 'connected') {
+    h = `<dl class="kv"><dt>Number</dt><dd>${esc((w.me?.id||'').split('@')[0])}</dd><dt>Name</dt><dd>${esc(w.me?.name||'–')}</dd><dt>Connected</dt><dd>${fmt(w.connectedAt)}</dd></dl>
+      <div class="row"><button class="danger" onclick="if(confirm('Unlink this WhatsApp number?')) apiBtn(this,'/api/logout','Logged out')">Log out</button></div>
+      <div class="hint">Run only one copy of the bot. PC and server at the same time will fight over the session.</div>`;
+  } else if (w.state === 'replaced') {
+    h = `<div class="banner bad">${esc(w.lastError)}</div><div class="row"><button class="primary" onclick="apiBtn(this,'/api/reconnect','Reconnecting')">Reconnect</button></div>`;
+  } else if (w.stage === 'pairing' && w.pairingCode) {
+    h = `<div class="code">${esc(w.pairingCode)}</div>
+      <ol class="steps"><li>On the phone <b>${esc(w.pairingNumber)}</b> open WhatsApp.</li>
+      <li>Menu → <b>Linked devices</b> → <b>Link a device</b>.</li>
+      <li>Tap <b>Link with phone number instead</b>.</li><li>Type the code above.</li></ol>
+      <div class="row"><button onclick="apiBtn(this,'/api/new-qr','Showing a QR code')">Use QR code instead</button></div>`;
+  } else if (w.stage === 'finishing') {
+    h = `<div class="banner warn">Code accepted — finishing the connection, please wait.</div>`;
+  } else if (w.qrDataUrl) {
+    h = `<div class="qr"><img src="${w.qrDataUrl}" alt="WhatsApp QR code"></div>
+      <div class="hint" style="text-align:center" id="qrLeft"></div>
+      <ol class="steps"><li>Open WhatsApp on the phone that will post.</li>
+      <li>Menu (⋮) → <b>Linked devices</b> → <b>Link a device</b>.</li><li>Point the camera at this code.</li></ol>
+      <div class="hint">The code refreshes by itself — that is normal. Don't reload the page while scanning.</div>
+      <div class="row"><button onclick="apiBtn(this,'/api/new-qr','New code')">New code</button></div>
+      <label for="pairPhone">Phone not with you? Link with a code instead</label>
+      <div class="row tight"><input id="pairPhone" placeholder="923001234567"><button class="primary" onclick="pair(this)">Get code</button></div>`;
+  } else {
+    h = `<div class="muted"><span class="spin"></span>Starting WhatsApp, please wait…</div>`;
+  }
+  const sig = w.state + w.stage + (w.qrDataUrl||'') + (w.pairingCode||'');
+  if ($('waBody')._sig !== sig) {
+    const typed = $('pairPhone')?.value;
+    $('waBody').innerHTML = h; $('waBody')._sig = sig;
+    if (typed && $('pairPhone')) $('pairPhone').value = typed;
+  }
+  if ($('qrLeft') && w.qrExpiresAt) {
+    const s = Math.max(0, Math.round((w.qrExpiresAt - Date.now())/1000));
+    $('qrLeft').textContent = s ? `This code refreshes in ${s}s` : 'Refreshing code…';
+  }
+}
+async function pair(btn) {
+  const phone = val('pairPhone');
+  if (!phone) return toast('Type the number with country code');
+  await busy(btn, async () => {
+    try { const { code } = await post('/api/pair', { phone }); toast('Code: ' + code, 9000); }
+    catch (e) { toast(e.message, 7000); }
+    refresh();
+  });
+}
+
+/* ---------- render ---------- */
+function render() {
+  if (S.starting) {
+    $('nextRun').textContent = 'Starting…';
+    $('banners').innerHTML = '<div class="banner warn">The bot is starting up. This takes a few seconds.</div>'
+      + (S.envProblem ? `<div class="banner bad">${esc(S.envProblem)}</div>` : '');
+    renderWA(S.whatsapp);
+    return;
+  }
+  const s = S.settings;
+  $('now').textContent = S.now;
+  $('nextRun').textContent = S.nextRun.text;
+  $('nextRun').className = 'pill ' + (s.paused ? 'bad' : (s.testMode || s.liveRepeat) ? 'warn' : 'ok');
+
+  const b = [];
+  if (S.envProblem) b.push(['bad', 'Settings file not loaded: ' + S.envProblem]);
+  if (S.backup.blocked) b.push(['bad', 'The saved list could not be read from your Google Sheet, so posting is paused — this stops the client getting old images again. Retrying every minute.']);
+  if (s.liveRepeat) b.push(['bad', `LIVE REPEAT is on — real posts every ${s.testIntervalMin} minutes. Switch it off in Settings before handover.`]);
+  if (s.testMode) b.push(['warn', `Test mode is on — posting to the TEST group every ${s.testIntervalMin} minutes.`]);
+  if (s.paused) b.push(['warn', 'Automation is stopped. Press Start on the Home tab.']);
+  if (S.whatsapp.state !== 'connected') b.push(['warn', 'WhatsApp is not connected — open the WhatsApp tab.']);
+  if (!s.targetJid) b.push(['warn', 'No LIVE group chosen — open the Groups tab.']);
+  $('banners').innerHTML = b.map(([c,t])=>`<div class="banner ${c}">${esc(t)}</div>`).join('');
+
+  /* home */
+  $('runPill').textContent = s.paused ? 'Stopped' : 'Running';
+  $('runPill').className = 'pill ' + (s.paused ? 'bad' : 'ok');
+  $('runBtn').textContent = s.paused ? '▶  Start automation' : '■  Stop automation';
+  $('runBtn').className = 'big ' + (s.paused ? 'primary' : 'stop');
+  $('runHint').textContent = s.paused ? 'Nothing is being posted right now.' : 'The daily post is active.';
+  $('homeTime').textContent = S.nextRun.repeating ? 'every ' + s.testIntervalMin + ' min' : (s.postTime || '–');
+  $('homeNote').textContent = S.nextRun.text;
+  const today = S.now.slice(0,10);
+  const doneCount = ['quran','hadees'].filter((k)=>S.lastDate[k]===today).length;
+  $('homeToday').textContent = doneCount + ' of 2';
+  $('homeTodayNote').textContent = doneCount === 2 ? 'Quran and Hadees already went out today.'
+    : doneCount === 1 ? 'One of the two has gone out today.' : 'Nothing has gone out today yet.';
+
+  $('feed').innerHTML = S.history.length
+    ? S.history.slice(0, 15).map((h)=>`<li><span class="dot ${h.ok?'':'bad'}">${h.ok?'✓':'!'}</span>
+        <div><div class="file">${esc(h.file || h.item)}${h.ok?'':' <span class="muted">— failed</span>'}</div>
+        <div class="when">${day(h.at)} ${clock(h.at)} · ${esc(h.item)} · to ${esc(h.target||'')}${h.mode!=='live'?' · '+esc(h.mode):''}</div>
+        ${h.ok?'':`<div class="when" style="color:var(--bad)">${esc(h.error||'')}</div>`}</div></li>`).join('')
+    : '<li class="muted">Nothing sent yet.</li>';
+
+  /* whatsapp */
+  renderWA(S.whatsapp);
+
+  /* groups */
+  $('liveGroup').innerHTML = s.targetJid ? `<b>${esc(s.targetName||'')}</b> <code>${esc(s.targetJid)}</code>` : '<span class="muted">not chosen yet</span>';
+  $('testGroup').innerHTML = s.testTargetJid ? `<b>${esc(s.testTargetName||'')}</b> <code>${esc(s.testTargetJid)}</code>` : '<span class="muted">not chosen yet</span>';
+
+  /* settings */
+  const em = S.serviceAccountEmail;
+  $('saEmail').innerHTML = s.driveSource === 'script'
+    ? `<div class="hint">Images are read <b>as you</b> through the Apps Script. Needs the Google Sheet connection below.</div>`
+    : em ? `<div class="hint">Folders must be shared with <code>${esc(em)}</code> <button class="small" onclick="navigator.clipboard.writeText('${esc(em)}');toast('Copied')">Copy</button></div>`
+      : `<div class="banner bad" style="margin-top:10px">No Google key loaded.</div>`;
+
+  $('testModeBtn').textContent = s.testMode ? '■  Stop test mode' : '▶  Start test mode';
+  $('testModeBtn').className = s.testMode ? 'stop' : '';
+  $('liveRepeatBtn').textContent = s.liveRepeat ? '■  Stop live repeat' : '▶  Start live repeat';
+  $('liveRepeatBtn').className = s.liveRepeat ? 'stop' : '';
+  $('testPill').hidden = !(s.testMode || s.liveRepeat);
+  $('testInfo').textContent = (s.testMode || s.liveRepeat) ? `${S.test.count} of ${s.testMaxPosts} posts done in this run.` : '';
+
+  const bk = S.backup;
+  $('backupPill').textContent = !bk.enabled ? 'Off' : bk.blocked ? 'Restore failed' : bk.lastError ? 'Error' : bk.lastOkAt ? 'Working' : 'Not checked';
+  $('backupPill').className = 'pill ' + (!bk.enabled ? '' : bk.blocked || bk.lastError ? 'bad' : bk.lastOkAt ? 'ok' : 'warn');
+  $('backupKv').innerHTML =
+    `<dt>Sheet</dt><dd>${bk.info ? esc(bk.info.sheetName) : '<span class="muted">press Check connection</span>'}</dd>
+     <dt>Last saved</dt><dd>list: ${fmt(bk.stateLastBackupAt)}<br>login: ${fmt(bk.sessionLastBackupAt)}</dd>
+     <dt>Loaded at start</dt><dd>list: ${esc(bk.stateRestoredFrom||'–')}, login: ${esc(bk.sessionRestored||'–')}</dd>
+     <dt>Already posted</dt><dd>Quran ${S.sentCount.quran}, Hadees ${S.sentCount.hadees}</dd>
+     ${bk.lastError?`<dt>Problem</dt><dd style="color:var(--bad)">${esc(bk.lastError)}</dd>`:''}`;
+
+  $('historyRows').innerHTML = S.history.length
+    ? S.history.map((h)=>`<tr><td>${fmt(h.at)}</td><td>${esc(h.mode)}</td><td>${esc(h.item)}</td><td>${esc(h.file||'')}</td><td>${esc(h.target||'')}</td><td>${h.ok?'✅ sent':'❌ '+esc(h.error)}</td></tr>`).join('')
+    : '<tr><td colspan="6" class="muted">Nothing sent yet.</td></tr>';
+
+  if (!filled) {
+    filled = true;
+    $('postTime').value = s.postTime; $('testInterval').value = s.testIntervalMin; $('testMax').value = s.testMaxPosts;
+    $('quranCaption').value = s.quranCaption; $('hadeesCaption').value = s.hadeesCaption;
+    $('pickOrder').value = s.pickOrder; $('adminNumber').value = s.adminNumber;
+    $('quranFolder').value = s.quranFolder; $('hadeesFolder').value = s.hadeesFolder;
+    $('driveSource').value = s.driveSource;
+  }
+  renderGroups();
+}
+
+async function refresh(btn) {
+  const go = async () => {
+    try { S = await api('/api/status'); render(); }
+    catch (e) { $('now').textContent = 'cannot reach the bot: ' + e.message; }
+  };
+  if (btn) await busy(btn, go); else await go();
+  clearTimeout(pollTimer);
+  const fast = S && (S.starting || S.whatsapp.state !== 'connected' || S.settings.testMode || S.settings.liveRepeat);
+  pollTimer = setTimeout(refresh, fast ? 3000 : 12000);
+}
+
+async function loadDrive(force, btn) {
+  const go = async () => {
+    try {
+      const { folders } = await api('/api/drive' + (force?'?refresh=1':''));
+      $('driveTiles').innerHTML = folders.map((f)=> f.error
+        ? `<div class="stat"><b>${esc(f.label)}</b><small style="color:var(--bad);margin-top:4px">${esc(f.error)}</small></div>`
+        : `<div class="stat"><small>${esc(f.label)} — ${esc(f.folderName)}</small><div class="big-num">${f.left}</div><small>not posted yet, of ${f.total}</small><small>next: ${esc(f.next||'—')}</small></div>`).join('');
+    } catch (e) { $('driveTiles').innerHTML = `<div class="stat muted">${esc(e.message)}</div>`; }
+  };
+  if (btn) await busy(btn, go); else await go();
+}
+
+async function loadGroups(btn) {
+  await busy(btn, async () => {
+    try { groups = (await api('/api/groups')).groups; renderGroups(); toast(groups.length + ' groups found'); }
+    catch (e) { toast(e.message, 7000); }
+  });
+}
+function renderGroups() {
+  if (!groups.length || !$('groupRows')) return;
+  const q = val('groupSearch').toLowerCase(), mode = val('groupFilter'), s = S?.settings || {};
+  const list = groups.filter((g)=>{
+    if (mode !== 'all' && g.kind === 'community') return false;
+    if (mode === 'admin' && !g.admin) return false;
+    if (mode === 'post' && !g.canPost) return false;
+    return !q || g.name.toLowerCase().includes(q) || g.id.includes(q);
+  });
+  $('groupRows').innerHTML = list.length ? list.map((g)=>{
+    const tag = g.id===s.targetJid ? ' <span class="pill ok">LIVE</span>' : g.id===s.testTargetJid ? ' <span class="pill warn">TEST</span>' : '';
+    const note = g.adminOnly && !g.admin ? '<small style="color:var(--bad)">only admins can post here</small>' : g.admin ? '<small>you are admin</small>' : '';
+    const nm = esc(JSON.stringify(g.name));
+    return `<tr><td>${esc(g.name)}${tag}</td><td>${esc(g.type)}${note}</td><td>${g.members}</td>
+      <td><div class="idcell"><code>${esc(g.id)}</code><button class="small" onclick="navigator.clipboard.writeText('${esc(g.id)}');toast('Copied')">Copy</button></div></td>
+      <td style="white-space:nowrap">${g.canPost?`<button class="small" onclick='setTarget(this,"test","${esc(g.id)}",${nm})'>Set TEST</button> <button class="small primary" onclick='setTarget(this,"live","${esc(g.id)}",${nm})'>Set LIVE</button>`:'<span class="muted">—</span>'}</td></tr>`;
+  }).join('') : `<tr><td colspan="5" class="muted">No groups match. Try “All groups”.</td></tr>`;
+}
+async function setTarget(btn, kind, id, name) {
+  if (kind==='live' && !confirm(`Daily posts will go to “${name}”.\n\nIs that the right group?`)) return;
+  await busy(btn, async () => {
+    try { await post('/api/target', { kind, id, name }); toast(`${kind.toUpperCase()} group set: ${name}`); }
+    catch (e) { toast(e.message, 6000); }
+    refresh();
+  });
+}
+
+async function sheetCheck(btn) {
+  await busy(btn, async () => {
+    $('sheetInfo').textContent = 'Checking…';
+    try {
+      const { info } = await post('/api/sheet-check');
+      $('sheetInfo').innerHTML = `✅ Connected to <b>${esc(info.sheetName)}</b>${info.sheetUrl?` — <a href="${esc(info.sheetUrl)}" target="_blank" rel="noopener">open</a>`:''}`;
+    } catch (e) { $('sheetInfo').innerHTML = `❌ ${esc(e.message)}`; }
+    refresh();
+  });
+}
+
+showTab(tab);
+refresh(); loadDrive();
+setInterval(()=>{ if (S && !S.starting && S.whatsapp.qrExpiresAt && $('qrLeft')) renderWA(S.whatsapp); }, 1000);
+</script>
+</body>
+</html>

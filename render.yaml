@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: quran-hadees-bot
+    runtime: node
+    plan: starter          # free plan sleeps and breaks the WhatsApp session
+    buildCommand: npm install
+    startCommand: node index.js
+    healthCheckPath: /health
+    envVars:
+      - key: QURAN_FOLDER_ID
+        sync: false
+      - key: HADEES_FOLDER_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: SHEETS_WEBAPP_URL
+        sync: false
+      - key: SHEETS_WEBAPP_SECRET
+        sync: false
+      - key: DASHBOARD_PASSWORD
+        sync: false
+      - key: POST_TIME
+        value: "04:00"
+      - key: TZ_NAME
+        value: Asia/Kuwait
