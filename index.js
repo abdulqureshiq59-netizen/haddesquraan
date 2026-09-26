@@ -14,12 +14,24 @@ const envInfo = { file: null, problem: null };
     envInfo.file = found;
   } else {
     require('dotenv').config();
-    const wrong = [
+
+    // On Render (and any host) there is no .env file - the values are set as environment
+    // variables instead. That is completely normal, so don't scare anyone with an error.
+    const fromHost = ['QURAN_FOLDER_ID', 'GOOGLE_SERVICE_ACCOUNT_JSON', 'SHEETS_WEBAPP_URL', 'DASHBOARD_PASSWORD']
+      .some((k) => process.env[k]);
+    if (fromHost) {
+      envInfo.file = 'environment variables (no .env file needed)';
+      envInfo.fromHost = true;
+    }
+
+    const wrong = envInfo.file ? null : [
       ['.env.txt', 'Windows saved it as ".env.txt". Rename it to exactly ".env" (turn on "File name extensions" in Explorer first).'],
       ['.env.example', 'You still have ".env.example". Rename/copy it to exactly ".env".'],
       ['env', 'The file is named "env". Rename it to ".env" - with the dot in front.'],
     ].find(([n]) => fs.existsSync(path.join(__dirname, n)) || fs.existsSync(path.join(process.cwd(), n)));
-    envInfo.problem = wrong ? wrong[1] : 'No .env file found next to index.js. Create one (copy .env.example).';
+    if (!envInfo.file) {
+      envInfo.problem = wrong ? wrong[1] : 'No .env file found next to index.js. Create one (copy .env.example).';
+    }
   }
 }
 
@@ -98,8 +110,8 @@ async function setupSteps() {
   }
 
   return [
-    { id: 'env', title: envInfo.file ? 'Settings file (.env) loaded' : '.env file NOT loaded', done: !!envInfo.file,
-      detail: envInfo.file ? envInfo.file : envInfo.problem },
+    { id: 'env', title: envInfo.fromHost ? 'Settings loaded from the host' : envInfo.file ? 'Settings file (.env) loaded' : '.env file NOT loaded',
+      done: !!envInfo.file, detail: envInfo.file || envInfo.problem },
     { id: 'key', title: s.driveSource === 'script' ? 'Reading Drive as your own account' : 'Google key loaded',
       done: s.driveSource === 'script' ? sheets.enabled() : !!key,
       detail: s.driveSource === 'script'
@@ -275,7 +287,8 @@ app.post('/api/backup-now', wrap(async () => {
 }));
 
 async function main() {
-  if (envInfo.file) log(`Settings file: ${envInfo.file}`);
+  if (envInfo.fromHost) log('Settings: taken from environment variables');
+  else if (envInfo.file) log(`Settings file: ${envInfo.file}`);
   else log(`!!! .env NOT LOADED - ${envInfo.problem}`);
   if (!drive.serviceAccountEmail()) log('WARNING: no Google key found - set GOOGLE_SERVICE_ACCOUNT_JSON or add service-account.json');
   if (!PASS) log('WARNING: DASHBOARD_PASSWORD is not set - the dashboard is open to anyone with the link');
