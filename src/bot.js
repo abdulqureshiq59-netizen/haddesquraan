@@ -5,6 +5,7 @@
 const store = require('./store');
 const drive = require('./drive');
 const wa = require('./whatsapp');
+const social = require('./social');
 const { log, sleep, nowParts, parseHHMM, chooseNext } = require('./util');
 
 const ITEMS = [
@@ -77,6 +78,31 @@ async function postPair(mode) {
         const buf = await drive.download(file.id, s.driveSource);
         const sent = await wa.sendImage(target, buf, file.mimeType, s[it.captionKey]);
 
+        // Instagram goes through the Make.com bridge, at the same moment as the WhatsApp
+        // post. "live repeat" is included so a demo shows both going out together.
+        // The TEST group runs are left out on purpose - they repeat every couple of
+        // minutes and would flood the real Instagram account.
+        let ig = null;
+        if (['live', 'manual', 'repeat'].includes(mode) && social.enabled(s)) {
+          try {
+            await social.post({
+              fileId: file.id,
+              caption: s.instagramCaption || s[it.captionKey] || '',
+              item: it.label,
+              file: file.name,
+              buffer: buf,
+            });
+            ig = 'ok';
+          } catch (e) {
+            ig = e.message;
+            log(`[${mode}] ${it.label}: WhatsApp went out but Instagram failed:`, e.message);
+            if (mode === 'live') {
+              await alertOnce(`ig-${it.key}-${today}`,
+                `⚠️ ${it.label} image was posted to WhatsApp but NOT to Instagram: ${e.message}`);
+            }
+          }
+        }
+
         if (records) {
           st.sent[it.key].push(file.id);
           st.lastDate[it.key] = today;
@@ -84,9 +110,10 @@ async function postPair(mode) {
           st.test.sent[it.key].push(file.id);
         }
         store.addHistory({ mode, item: it.label, file: file.name, target: targetName || target, ok: true,
-                           remaining: records ? remaining : null, msgId: sent?.id || null, members: sent?.members ?? null });
+                           remaining: records ? remaining : null, msgId: sent?.id || null, members: sent?.members ?? null,
+                           ig });
         store.save();
-        results.push({ item: it.label, file: file.name, remaining });
+        results.push({ item: it.label, file: file.name, remaining, instagram: ig });
         log(`[${mode}] ${it.label}: sent "${file.name}" to ${targetName || target}` +
             `${sent?.members ? ` (${sent.members} members)` : ''}${records ? ` (${remaining} new left)` : ''}` +
             `${sent?.id ? ` id=${sent.id}` : ''}`);
