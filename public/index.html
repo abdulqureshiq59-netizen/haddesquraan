@@ -222,6 +222,20 @@
   <!-- ========== SETTINGS ========== -->
   <div id="page-settings" hidden>
     <section class="card">
+      <h2>Instagram <span class="pill" id="igPill">–</span></h2>
+      <p class="what">The daily image also goes to Instagram, through the Make.com bridge.</p>
+      <div class="row tight">
+        <button id="igBtn" data-act="ig" onclick="saveSettings(this,{instagramOn:!S.settings.instagramOn})">–</button>
+        <span class="hint" style="margin:0" id="igWhy"></span>
+      </div>
+      <label for="igCaption">Instagram caption (leave empty to use the WhatsApp caption)</label>
+      <textarea id="igCaption" placeholder="#Quran #Hadees"></textarea>
+      <div class="row tight">
+        <button data-act="igc" onclick="saveSettings(this,{instagramCaption:val('igCaption')})">Save caption</button>
+      </div>
+    </section>
+
+    <section class="card">
       <h2>Testing <span class="pill warn" id="testPill" hidden>running</span></h2>
       <p class="what">For checking before handover. Turn both off when you are done.</p>
       <div class="row tight">
@@ -451,7 +465,8 @@ function render() {
   $('feed').innerHTML = S.history.length
     ? S.history.slice(0, 15).map((h)=>`<li><span class="dot ${h.ok?'':'bad'}">${h.ok?'✓':'!'}</span>
         <div><div class="file">${esc(h.file || h.item)}${h.ok?'':' <span class="muted">— failed</span>'}</div>
-        <div class="when">${day(h.at)} ${clock(h.at)} · ${esc(h.item)} · to ${esc(h.target||'')}${h.mode!=='live'?' · '+esc(h.mode):''}</div>
+        <div class="when">${day(h.at)} ${clock(h.at)} · ${esc(h.item)} · to ${esc(h.target||'')}${h.mode!=='live'?' · '+esc(h.mode):''}${h.ig==='ok'?' · <b>+ Instagram</b>':''}</div>
+        ${h.ig&&h.ig!=='ok'?`<div class="when" style="color:var(--warn)">Instagram failed: ${esc(h.ig)}</div>`:''}
         ${h.ok?'':`<div class="when" style="color:var(--bad)">${esc(h.error||'')}</div>`}</div></li>`).join('')
     : '<li class="muted">Nothing sent yet.</li>';
 
@@ -461,6 +476,14 @@ function render() {
   /* groups */
   $('liveGroup').innerHTML = s.targetJid ? `<b>${esc(s.targetName||'')}</b> <code>${esc(s.targetJid)}</code>` : '<span class="muted">not chosen yet</span>';
   $('testGroup').innerHTML = s.testTargetJid ? `<b>${esc(s.testTargetName||'')}</b> <code>${esc(s.testTargetJid)}</code>` : '<span class="muted">not chosen yet</span>';
+
+  /* settings - instagram */
+  const ig = S.instagram || {};
+  $('igBtn').textContent = s.instagramOn ? '\u25a0  Turn Instagram off' : '\u25b6  Turn Instagram on';
+  $('igBtn').className = s.instagramOn ? 'stop' : '';
+  $('igPill').textContent = ig.ready ? 'on' : s.instagramOn ? 'not working' : 'off';
+  $('igPill').className = 'pill ' + (ig.ready ? 'ok' : s.instagramOn ? 'bad' : '');
+  $('igWhy').textContent = ig.ready ? 'Posting to Instagram every day at the post time.' : (ig.why || '');
 
   /* settings */
   $('testModeBtn').textContent = s.testMode ? '■  Stop test mode' : '▶  Start test mode';
@@ -475,6 +498,7 @@ function render() {
     $('postTime').value = s.postTime;
     $('testInterval').value = s.testIntervalMin;
     $('testMax').value = s.testMaxPosts;
+    $('igCaption').value = s.instagramCaption || '';
   }
   renderGroups();
 }
