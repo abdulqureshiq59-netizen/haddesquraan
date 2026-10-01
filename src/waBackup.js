@@ -30,14 +30,26 @@ function finishedLogin() {
   }
 }
 
+// creds.json is the only file WhatsApp really needs to come back without a new scan.
+// The app-state-sync keys only save it some re-syncing, so they are added just while the
+// backup stays small - a huge backup is what made saving fail silently before.
+const MAX_BACKUP_BYTES = Number(process.env.WA_BACKUP_MAX_BYTES || 200 * 1024);
+
 function snapshot() {
   if (!fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) return null;
   if (!finishedLogin()) return null;
-  const files = {};
-  for (const name of fs.readdirSync(AUTH_DIR)) {
-    if (!KEEP.test(name)) continue;
-    const p = path.join(AUTH_DIR, name);
-    if (fs.statSync(p).isFile()) files[name] = fs.readFileSync(p, 'utf8');
+  const files = { 'creds.json': fs.readFileSync(path.join(AUTH_DIR, 'creds.json'), 'utf8') };
+  let size = files['creds.json'].length;
+
+  const extras = fs.readdirSync(AUTH_DIR)
+    .filter((n) => n !== 'creds.json' && KEEP.test(n))
+    .map((n) => ({ name: n, at: fs.statSync(path.join(AUTH_DIR, n)).mtimeMs }))
+    .sort((a, b) => b.at - a.at);          // newest keys first, they are the useful ones
+  for (const { name } of extras) {
+    const body = fs.readFileSync(path.join(AUTH_DIR, name), 'utf8');
+    if (size + body.length > MAX_BACKUP_BYTES) break;
+    files[name] = body;
+    size += body.length;
   }
   const hash = crypto.createHash('sha1').update(JSON.stringify(files)).digest('hex');
   return { files, hash };
@@ -53,6 +65,7 @@ async function backupNow() {
     await sheets.saveBlob('wa-auth', encode(snap.files));
     lastHash = snap.hash;
     info.lastBackupAt = new Date().toISOString();
+    log(`WhatsApp login backed up to the Sheet (${Object.keys(snap.files).length} files)`);
   } catch (e) {
     log('WhatsApp session backup failed, retrying in 2 min:', e.message);
     schedule(120000);
