@@ -43,6 +43,9 @@ const waBackup = require('./src/waBackup');
 const wa = require('./src/whatsapp');
 const drive = require('./src/drive');
 const bot = require('./src/bot');
+const social = require('./src/social');
+const tunnel = require('./src/tunnel');
+const image = require('./src/image');
 const { log, quietNoise, digits, nowParts, parseHHMM } = require('./src/util');
 quietNoise();
 
@@ -54,6 +57,39 @@ const app = express();
 app.use(express.json({ limit: '100kb' }));
 
 app.get('/health', (req, res) => res.send('ok')); // for uptime pings (keeps Render awake)
+
+// ---------- public image link (no password - Instagram has to be able to download it) ----------
+// /img/<drive file id>.<signature>.jpg   The signature is made from IMG_SECRET, so the
+// address cannot be guessed and only images this bot posted can be opened.
+const imgCache = new Map(); // fileId -> { buf, at }
+const IMG_CACHE_MS = 6 * 60 * 60 * 1000;
+
+app.use('/img', async (req, res, next) => {
+  if (req.method !== 'GET') return next();
+  const tail = String(req.path || '').replace(/^\/img/, '').replace(/^\//, '');
+  const m = /^(.+)\.([a-f0-9]{12})\.jpg$/i.exec(decodeURIComponent(tail));
+  if (!m) return res.status(404).send('Not found');
+  const [, fileId, sig] = m;
+  try {
+    if (!social.verify(fileId, sig)) return res.status(404).send('Not found');
+    const hit = imgCache.get(fileId);
+    let buf = hit && Date.now() - hit.at < IMG_CACHE_MS ? hit.buf : null;
+    if (!buf) {
+      const st = store.get();
+      const raw = await drive.download(fileId, st.settings.driveSource);
+      ({ buffer: buf } = await image.forInstagram(raw));
+      imgCache.set(fileId, { buf, at: Date.now() });
+      if (imgCache.size > 20) imgCache.delete(imgCache.keys().next().value);
+    }
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Content-Length', String(buf.length));
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(buf);
+  } catch (e) {
+    log('Image link failed:', e.message);
+    res.status(500).send('Could not prepare the image');
+  }
+});
 
 // ---------- login ----------
 const same = (a, b) => {
@@ -186,6 +222,13 @@ app.get('/api/status', wrap(async () => {
     lastDate: st.lastDate,
     sentCount: { quran: st.sent.quran.length, hadees: st.sent.hadees.length },
     test: { count: st.test.count, lastAt: st.test.lastAt },
+    instagram: {
+      on: !!st.settings.instagramOn,
+      ready: social.enabled(st.settings),
+      why: social.notReady(st.settings),
+      bridge: social.webhookUrl() ? 'Make.com webhook is set' : 'not set',
+      publicUrl: social.publicBase() || null,
+    },
     backup: {
       enabled: sheets.enabled(),
       blocked: store.isBlocked(),
@@ -258,6 +301,14 @@ app.post('/api/settings', wrap(async (req) => {
   if (b.quranCaption !== undefined) next.quranCaption = String(b.quranCaption).slice(0, 1000);
   if (b.hadeesCaption !== undefined) next.hadeesCaption = String(b.hadeesCaption).slice(0, 1000);
   if (b.adminNumber !== undefined) next.adminNumber = digits(b.adminNumber);
+  if (b.instagramOn !== undefined) {
+    if (b.instagramOn) {
+      if (!social.webhookUrl()) throw new Error('Set SOCIAL_WEBHOOK_URL first - that is the Make.com webhook address');
+      if (!social.publicBase()) throw new Error('Set PUBLIC_URL first - Instagram needs a public link to the image');
+    }
+    next.instagramOn = !!b.instagramOn;
+  }
+  if (b.instagramCaption !== undefined) next.instagramCaption = String(b.instagramCaption).slice(0, 2200);
   if (b.testIntervalMin !== undefined) {
     const n = Number(b.testIntervalMin);
     if (!Number.isInteger(n) || n < 1 || n > 60) throw new Error('Test interval must be 1-60 minutes');
@@ -324,6 +375,12 @@ async function main() {
 
   // Open the dashboard straight away, so you can always see what is happening
   app.listen(PORT, () => log(`Dashboard running on http://localhost:${PORT}`));
+
+  // Running on your own PC with Instagram switched on? Then a public address is needed,
+  // because Instagram downloads the picture itself. On Render this is skipped.
+  if (!process.env.PUBLIC_URL && !process.env.RENDER_EXTERNAL_URL && String(process.env.AUTO_TUNNEL || '') !== 'false') {
+    tunnel.start(PORT).catch((e) => log('Tunnel could not be opened:', e.message));
+  }
 
   const r = await store.init();
   log(`State: ${r}`);
