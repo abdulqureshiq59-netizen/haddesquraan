@@ -8,7 +8,7 @@ const { log, sleep, encode, decode } = require('./util');
 const { DATA_DIR } = require('./store');
 
 const AUTH_DIR = path.join(DATA_DIR, 'wa-auth');
-const info = { lastBackupAt: null, restored: null };
+const info = { lastBackupAt: null, restored: null, pending: false, lastError: null };
 let lastHash = null;
 let timer = null;
 
@@ -17,8 +17,22 @@ let timer = null;
 // which made every backup huge and slow.
 const KEEP = /^(creds\.json|app-state-sync-key-.*\.json|app-state-sync-version-.*\.json)$/;
 
+// While waiting for a QR scan, Baileys already writes a creds.json that is NOT a finished
+// login yet. Backing that up would wipe the good session in the Sheet - which is exactly
+// what happens if the server restarts at that moment. So a backup is only made once the
+// login is really complete.
+function finishedLogin() {
+  try {
+    const creds = JSON.parse(fs.readFileSync(path.join(AUTH_DIR, 'creds.json'), 'utf8'));
+    return !!(creds && creds.registered && creds.me);
+  } catch {
+    return false;
+  }
+}
+
 function snapshot() {
   if (!fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) return null;
+  if (!finishedLogin()) return null;
   const files = {};
   for (const name of fs.readdirSync(AUTH_DIR)) {
     if (!KEEP.test(name)) continue;
@@ -32,6 +46,7 @@ function snapshot() {
 async function backupNow() {
   timer = null;
   if (!sheets.enabled()) return;
+  if (info.pending) return;   // we could not read the saved login yet - do NOT overwrite it
   try {
     const snap = snapshot();
     if (!snap || snap.hash === lastHash) return;
@@ -50,14 +65,45 @@ function schedule(delay = 120000) {
   timer = setTimeout(backupNow, delay);
 }
 
+// Keeps trying in the background. Until it succeeds the bot must NOT ask for a new QR,
+// because a saved login probably exists in the Sheet and a fresh scan would wipe it.
+function retryRestoreInBackground() {
+  const timer = setInterval(async () => {
+    try {
+      const r = await restoreOnce();
+      if (r !== 'error') {
+        info.pending = false;
+        info.restored = r;
+        clearInterval(timer);
+        log(`WhatsApp login restore finished: ${r}`);
+        if (typeof info.onRestored === 'function') info.onRestored(r);
+      }
+    } catch (e) {
+      info.lastError = e.message;
+    }
+  }, 30000);
+  timer.unref?.();
+}
+
 async function restoreIfMissing() {
+  const r = await restoreOnce();
+  if (r === 'error') {
+    info.pending = true;
+    log('!!! Could not read the saved WhatsApp login from the Sheet. NOT asking for a new QR yet - retrying every 30s so the saved login is not lost.');
+    retryRestoreInBackground();
+  }
+  return (info.restored = r);
+}
+
+async function restoreOnce() {
   fs.mkdirSync(AUTH_DIR, { recursive: true });
-  if (fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) return (info.restored = 'local');
-  if (!sheets.enabled()) return (info.restored = 'none');
-  for (let i = 1; i <= 5; i++) {
+  if (fs.existsSync(path.join(AUTH_DIR, 'creds.json'))) return 'local';
+  if (!sheets.enabled()) return 'none';
+  const tries = Number(process.env.WA_RESTORE_ATTEMPTS || 5);
+  for (let i = 1; i <= tries; i++) {
     try {
       const data = await sheets.getBlob('wa-auth');
-      if (!data) return (info.restored = 'none');
+      if (!data) return 'none';
       const files = decode(data);
 
       // An old backup can contain thousands of stale per-chat session files. Restoring those
@@ -73,7 +119,7 @@ async function restoreIfMissing() {
       if (!creds || !creds.registered || !creds.me) {
         log('The saved WhatsApp login in the Sheet is incomplete - ignoring it, please link again.');
         await clearAll();
-        return (info.restored = 'none');
+        return 'none';
       }
 
       for (const [name, content] of wanted) {
@@ -81,13 +127,14 @@ async function restoreIfMissing() {
       }
       lastHash = snapshot()?.hash || null;
       log(`WhatsApp login restored from Google Sheet (${wanted.length} files, ${Object.keys(files).length - wanted.length} old ones skipped)`);
-      return (info.restored = 'sheet');
+      return 'sheet';
     } catch (e) {
-      log(`WhatsApp session restore failed (attempt ${i}/5):`, e.message);
-      await sleep(5000);
+      info.lastError = e.message;
+      log(`WhatsApp login restore failed (attempt ${i}/${tries}):`, e.message);
+      if (i < tries) await sleep(5000);
     }
   }
-  return (info.restored = 'error');
+  return 'error';
 }
 
 async function clearAll() {
@@ -108,4 +155,5 @@ async function flush() {
   await backupNow(); // skipped automatically if nothing changed
 }
 
-module.exports = { AUTH_DIR, info, schedule, backupNow, restoreIfMissing, clearAll, flush };
+module.exports = {
+  finishedLogin, AUTH_DIR, info, schedule, backupNow, restoreIfMissing, restoreOnce, clearAll, flush };
